@@ -3,16 +3,20 @@ import pandas as pd
 import seaborn as sb
 import matplotlib.pyplot as plt
 
-# --- Page Configuration ---
 st.set_page_config(page_title="📈 Nifty Stocks SMA Dashboard", layout="wide")
 
 # --- Load Data ---
 df = pd.read_csv("Stocks_2025.csv")
 df = df.drop('Unnamed: 0', axis=1)
+
+# Clean column names and Date
+df.columns = df.columns.str.strip()
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+df = df.dropna(subset=['Date'])
+
+df['Stock'] = df['Stock'].replace(" ", "", regex=True)
 df['SMA_50'] = df['Close'].rolling(window=50, min_periods=1).mean()
 df['SMA_200'] = df['Close'].rolling(window=200, min_periods=1).mean()
-df['Date'] = pd.to_datetime(df['Date'])
-df['Stock'] = df['Stock'].replace(" ", "", regex=True)
 
 # --- Title ---
 st.title("📊 Nifty Stocks SMA (50 & 200) Dashboard")
@@ -20,20 +24,17 @@ st.title("📊 Nifty Stocks SMA (50 & 200) Dashboard")
 # --- Sidebar Filters ---
 st.sidebar.header("🔍 Filter Options")
 
-# Category Selection
-categories = sorted(df["Category"].unique())
+categories = sorted(df["Category"].dropna().unique())
 selected_category = st.sidebar.selectbox("Select Category:", categories)
 
 filtered_category = df[df["Category"] == selected_category]
 
-# Stock Selection
-stocks = sorted(filtered_category["Stock"].unique())
+stocks = sorted(filtered_category["Stock"].dropna().unique())
 selected_stock = st.sidebar.selectbox("Select Stock:", stocks)
 
-# Filter final data
 selected_data = filtered_category[filtered_category["Stock"] == selected_stock]
 
-# --- Display Data ---
+# --- Show Data ---
 with st.expander("📂 View Raw Data"):
     st.dataframe(selected_data.tail(20))
 
@@ -57,17 +58,19 @@ st.pyplot(fig)
 st.markdown("---")
 st.markdown("### 💡 Quick Insights")
 
-latest_close = selected_data["Close"].iloc[-1]
-latest_sma50 = selected_data["SMA_50"].iloc[-1]
-latest_sma200 = selected_data["SMA_200"].iloc[-1]
+if not selected_data.empty:
+    latest_close = selected_data["Close"].iloc[-1]
+    latest_sma50 = selected_data["SMA_50"].iloc[-1]
+    latest_sma200 = selected_data["SMA_200"].iloc[-1]
 
-col1, col2, col3 = st.columns(3)
-col1.metric("📉 Latest Close", f"₹{latest_close:.2f}")
-col2.metric("📘 SMA 50", f"₹{latest_sma50:.2f}")
-col3.metric("📕 SMA 200", f"₹{latest_sma200:.2f}")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("📉 Latest Close", f"₹{latest_close:.2f}")
+    col2.metric("📘 SMA 50", f"₹{latest_sma50:.2f}")
+    col3.metric("📕 SMA 200", f"₹{latest_sma200:.2f}")
 
-# Trend Signal
-if latest_sma50 > latest_sma200:
-    st.success("✅ **Bullish Signal** — SMA 50 crossed above SMA 200 (Golden Cross)")
+    if latest_sma50 > latest_sma200:
+        st.success("✅ **Bullish Signal** — SMA 50 crossed above SMA 200 (Golden Cross)")
+    else:
+        st.error("⚠️ **Bearish Signal** — SMA 50 below SMA 200 (Death Cross)")
 else:
-    st.error("⚠️ **Bearish Signal** — SMA 50 below SMA 200 (Death Cross)")
+    st.warning("⚠️ No data available for the selected stock.")
